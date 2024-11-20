@@ -1,0 +1,11 @@
+llama-cpp-python
+duckduckgo-search
+colorama
+requests
+beautifulsoup4
+trafilatura
+readchar
+keyboard
+curses-windows; sys_platform == 'win32'
+tqdm
+urllib3
