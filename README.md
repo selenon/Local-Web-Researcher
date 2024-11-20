@@ -73,7 +73,7 @@ Then create the model:
 ollama create research-phi3 -f modelfile
 
 
-Note: This specific configuration is necessary as recent Ollama versions have reduced context windows on models like phi3:3.8b-mini-128k-instruct despite the name suggesing high context which is why the modelfile step is necessary due to the high amount of information being used during the research process. 
+Note: This specific configuration is necessary as recent Ollama versions have reduced context windows on models like phi3:3.8b-mini-128k-instruct despite the name suggesting high context which is why the modelfile step is necessary due to the high amount of information being used during the research process. 
 
 ## Usage
 
