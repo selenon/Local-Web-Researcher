@@ -23,15 +23,15 @@ class WebScraper:
         self.last_request_time = {}
 
     def can_fetch(self, url):
-        parsed_url = urlparse(url)
-        robots_url = f"{parsed_url.scheme}://{parsed_url.netloc}/robots.txt"
-        self.robot_parser.set_url(robots_url)
-        try:
-            self.robot_parser.read()
-            return self.robot_parser.can_fetch(self.session.headers["User-Agent"], url)
-        except Exception as e:
-            logger.warning(f"Error reading robots.txt for {url}: {e}")
-            return True  # Assume allowed if robots.txt can't be read
+        # parsed_url = urlparse(url)
+        # robots_url = f"{parsed_url.scheme}://{parsed_url.netloc}/robots.txt"
+        # self.robot_parser.set_url(robots_url)
+        # try:
+        #     self.robot_parser.read()
+        #     return self.robot_parser.can_fetch(self.session.headers["User-Agent"], url)
+        # except Exception as e:
+        #     logger.warning(f"Error reading robots.txt for {url}: {e}")
+            return True  # ignore robots.txt
 
     def respect_rate_limit(self, url):
         domain = urlparse(url).netloc
@@ -125,16 +125,16 @@ def get_web_content(urls):
 
 # Standalone can_fetch function
 def can_fetch(url):
-    parsed_url = urlparse(url)
-    robots_url = f"{parsed_url.scheme}://{parsed_url.netloc}/robots.txt"
-    rp = RobotFileParser()
-    rp.set_url(robots_url)
-    try:
-        rp.read()
-        return rp.can_fetch("*", url)
-    except Exception as e:
-        logger.warning(f"Error reading robots.txt for {url}: {e}")
-        return True  # Assume allowed if robots.txt can't be read
+    # parsed_url = urlparse(url)
+    # robots_url = f"{parsed_url.scheme}://{parsed_url.netloc}/robots.txt"
+    # rp = RobotFileParser()
+    # rp.set_url(robots_url)
+    # try:
+    #     rp.read()
+    #     return rp.can_fetch("*", url)
+    # except Exception as e:
+    #     logger.warning(f"Error reading robots.txt for {url}: {e}")
+        return True  # ignore robots.xt
 
 if __name__ == "__main__":
     test_urls = [
