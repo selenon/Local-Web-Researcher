@@ -12,7 +12,7 @@ Here's how it works:
    - Performs web searches
    - Analyzes search results selecting the most relevant web pages
    - Scrapes and extracts relevant information for selected web pages
-   - Documents all content it has found during the research session into a research file including links to websites that the content was retrieved from
+   - Documents all content it has found during the research session into a research text file including links to websites that the content was retrieved from
 4. After investigating all focus areas, the LLM based on information is found generates new focus areas, and repeating it's research cycle, often finding new relevant focus areas based on findings in research it has previously found leading to interesting and novel research focuses in some cases.
 5. You can let it research as long as you would like at any time being able to input a quit command which then stops the research and causes the LLM to review all the content collected so far in full and generate a comprehensive summary to respond to your original query or topic. 
 6. Then the LLM will enter a conversation mode where you can ask specific questions about the research findings if desired.
