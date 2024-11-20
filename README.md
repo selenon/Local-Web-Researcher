@@ -57,6 +57,7 @@ pip install -r requirements.txt
 Create a file named `modelfile` with these exact contents:
 
 FROM your-model-name
+
 PARAMETER num_ctx 38000
 
 Replace "your-model-name" with your chosen model (e.g., phi3:3.8b-mini-128k-instruct).
