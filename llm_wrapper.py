@@ -44,7 +44,7 @@ class LLMWrapper:
                 'top_p': kwargs.get('top_p', self.llm_config.get('top_p', 0.9)),
                 'stop': kwargs.get('stop', self.llm_config.get('stop', [])),
                 'num_predict': kwargs.get('max_tokens', self.llm_config.get('max_tokens', 55000)),
-                'context_length': self.llm_config.get('n_ctx', 55000)
+                'num_ctx': self.llm_config.get('n_ctx', 55000)
             }
         }
         response = requests.post(url, json=data, stream=True)
