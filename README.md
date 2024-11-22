@@ -40,20 +40,23 @@ The key distinction is that this isn't just a chatbot - it's an automated resear
 
 1. Clone the repository:
 
+```sh
 git clone https://github.com/TheBlewish/Automated-AI-Web-Researcher-Ollama
 cd Automated-AI-Web-Researcher-Ollama
-
+```
 
 2. Create and activate a virtual environment:
 
+```sh
 python -m venv venv
 source venv/bin/activate  # On Windows, use venv\Scripts\activate
-
+```
 
 3. Install dependencies:
 
+```sh
 pip install -r requirements.txt
-
+```
 
 4. Install and Configure Ollama:
 - Install Ollama following instructions at https://ollama.ai
@@ -62,16 +65,19 @@ pip install -r requirements.txt
 
 Create a file named `modelfile` with these exact contents:
 
+```
 FROM your-model-name
 
 PARAMETER num_ctx 38000
+```
 
 Replace "your-model-name" with your chosen model (e.g., phi3:3.8b-mini-128k-instruct).
 
 Then create the model:
 
+```sh
 ollama create research-phi3 -f modelfile
-
+```
 
 Note: This specific configuration is necessary as recent Ollama versions have reduced context windows on models like phi3:3.8b-mini-128k-instruct despite the name suggesting high context which is why the modelfile step is necessary due to the high amount of information being used during the research process. 
 
@@ -79,24 +85,26 @@ Note: This specific configuration is necessary as recent Ollama versions have re
 
 1. Start Ollama:
 
+```sh
 ollama serve
-
+```
 
 2. Run the researcher:
 
+```sh
 python Web-LLM.py
-
+```
 
 3. Start a research session:
-- Type @ followed by your research query
+- Type `@` followed by your research query
 - Press CTRL+D to submit
-- Example: "@What year is global population projected to start declining?"
+- Example: `@What year is global population projected to start declining?`
 
 4. During research you can use the following commands by typing the letter associated with each and submitting with CTRL+D:
-- Use 's' to show status.
-- Use 'f' to show current focus.
-- Use 'p' to pause and assess research progress, which will give you an assessment from the LLM after reviewing the entire research content whether it can answer your query or not with the content it has so far collected, then it waits for you to input one of two commands, 'c' to continue with the research or 'q' to terminate it which will result in a summary like if you terminated it without using the pause feature.
-- Use 'q' to quit research.
+- Use `s` to show status.
+- Use `f` to show current focus.
+- Use `p` to pause and assess research progress, which will give you an assessment from the LLM after reviewing the entire research content whether it can answer your query or not with the content it has so far collected, then it waits for you to input one of two commands, `c` to continue with the research or `q` to terminate it which will result in a summary like if you terminated it without using the pause feature.
+- Use `q` to quit research.
 
 5. After research completes:
 - Wait for the summary to be generated, and review the LLM's findings.
@@ -130,7 +138,7 @@ This project is licensed under the MIT License - see the [LICENSE] file for deta
 - DuckDuckGo for their search API
 
 ## Personal Note
-This tool represents an attempt to bridge the gap between simple LLM interactions and genuine research capabilities. By structuring the research process and maintaining documentation, it aims to provide more thorough and verifiable results than traditional LLM conversations. It also represents an attempt to improve on my previous project 'Web-LLM-Assistant-Llamacpp-Ollama' which simply gave LLM's the ability to search and scrape websites to answer questions. This new program, unlike it's predecessor I feel thos program takes that capability and uses it in a novel and actually very useful way, I feel that it is the most advanced and useful way I could conceive of building on my previous program, as a very new proggrammer this being my second ever program I feel very good about the result, I hope that it hits the mark! 
+This tool represents an attempt to bridge the gap between simple LLM interactions and genuine research capabilities. By structuring the research process and maintaining documentation, it aims to provide more thorough and verifiable results than traditional LLM conversations. It also represents an attempt to improve on my previous project 'Web-LLM-Assistant-Llamacpp-Ollama' which simply gave LLM's the ability to search and scrape websites to answer questions. This new program, unlike it's predecessor I feel thos program takes that capability and uses it in a novel and actually very useful way, I feel that it is the most advanced and useful way I could conceive of building on my previous program, as a very new programmer this being my second ever program I feel very good about the result, I hope that it hits the mark! 
 Given how much I have now been using it myself, unlike the previous program which felt more like a novelty then an actual tool, this is actually quite useful and unique, but I am quite biased!
 
 Please enjoy! and feel free to submit any suggestions for improvements, so that we can make this automated AI researcher even more capable.

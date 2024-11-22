@@ -61,16 +61,13 @@ def print_header():
     print(Fore.YELLOW + """
     Welcome to the Advanced Research Assistant!
 
-    Commands:
-    - For web search: start message with '/'
-      Example: "/latest news on AI advancements"
-
-    - For research mode: start message with '@'
+    Usage:
+    - Start your research query with '@'
       Example: "@analyze the impact of AI on healthcare"
 
     Press CTRL+D (Linux/Mac) or CTRL+Z (Windows) to submit input.
     """ + Style.RESET_ALL)
-
+    
 def get_multiline_input() -> str:
     """Get multiline input using raw terminal mode for reliable CTRL+D handling"""
     print(f"{Fore.GREEN}📝 Enter your message (Press CTRL+D to submit):{Style.RESET_ALL}")
