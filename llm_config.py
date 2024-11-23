@@ -1,6 +1,6 @@
 # llm_config.py
 
-LLM_TYPE = "anthropic"  # Options: 'llama_cpp', 'ollama', 'openai', 'anthropic'
+LLM_TYPE = "openai"  # Options: 'llama_cpp', 'ollama', 'openai', 'anthropic'
 
 # LLM settings for llama_cpp
 MODEL_PATH = "/home/james/llama.cpp/models/gemma-2-9b-it-Q6_K.gguf" # Replace with your llama.cpp models filepath
@@ -37,9 +37,10 @@ LLM_CONFIG_OPENAI = {
     "api_key": "",  # Set via environment variable OPENAI_API_KEY
     "base_url": None,  # Optional: Set to use alternative OpenAI-compatible endpoints
     "model_name": "gpt-4o",  # Required: Specify the model to use
+    "messages": [],  # Placeholder for conversation history
     "temperature": 0.7,
     "top_p": 0.9,
-    "max_tokens": 4096,
+    "max_tokens": 32000,
     "stop": ["User:", "\n\n"],
     "presence_penalty": 0,
     "frequency_penalty": 0

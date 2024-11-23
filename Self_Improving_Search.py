@@ -1,7 +1,10 @@
+"""
+Enhanced search functionality with multiple providers and self-improving capabilities.
+"""
 import time
 import re
 import os
-from typing import List, Dict, Tuple, Union
+from typing import List, Dict, Tuple, Union, Any
 from colorama import Fore, Style
 import logging
 import sys
@@ -10,7 +13,9 @@ from web_scraper import get_web_content, can_fetch
 from llm_config import get_llm_config
 from llm_response_parser import UltimateLLMResponseParser
 from llm_wrapper import LLMWrapper
+from search_manager import SearchManager
 from urllib.parse import urlparse
+from system_config import RESEARCH_CONFIG
 
 # Set up logging
 log_directory = 'logs'
@@ -55,6 +60,19 @@ class EnhancedSelfImprovingSearch:
         self.parser = parser
         self.max_attempts = max_attempts
         self.llm_config = get_llm_config()
+        self.search_manager = SearchManager()
+        
+        # Rate limiting configuration
+        self.requests_per_minute = RESEARCH_CONFIG['rate_limiting']['requests_per_minute']
+        self.concurrent_requests = RESEARCH_CONFIG['rate_limiting']['concurrent_requests']
+        self.cooldown_period = RESEARCH_CONFIG['rate_limiting']['cooldown_period']
+        
+        self.last_request_time = 0
+        self.request_count = 0
+        
+        self.last_query = None
+        self.last_time_range = None
+        self.WHITESPACE_PATTERN = r'\s+'
 
     @staticmethod
     def initialize_llm():
@@ -75,6 +93,8 @@ class EnhancedSelfImprovingSearch:
 
             try:
                 formulated_query, time_range = self.formulate_query(user_query, attempt)
+                self.last_query = formulated_query
+                self.last_time_range = time_range
 
                 print(f"{Fore.YELLOW}Original query: {user_query}{Style.RESET_ALL}")
                 print(f"{Fore.YELLOW}Formulated query: {formulated_query}{Style.RESET_ALL}")
@@ -86,15 +106,19 @@ class EnhancedSelfImprovingSearch:
                     continue
 
                 search_results = self.perform_search(formulated_query, time_range)
+                if not isinstance(search_results, dict):
+                    print(f"{Fore.RED}Error: Invalid search results format. Expected dict, got {type(search_results)}{Style.RESET_ALL}")
+                    attempt += 1
+                    continue
 
-                if not search_results:
+                if not search_results.get('success') or not search_results.get('results'):
                     print(f"{Fore.RED}No results found. Retrying with a different query...{Style.RESET_ALL}")
                     attempt += 1
                     continue
 
                 self.display_search_results(search_results)
 
-                selected_urls = self.select_relevant_pages(search_results, user_query)
+                selected_urls = self.select_relevant_pages(search_results['results'], user_query)
 
                 if not selected_urls:
                     print(f"{Fore.RED}No relevant URLs found. Retrying...{Style.RESET_ALL}")
@@ -102,7 +126,6 @@ class EnhancedSelfImprovingSearch:
                     continue
 
                 print(Fore.MAGENTA + "⚙️ Scraping selected pages..." + Style.RESET_ALL)
-                # Scraping is done without OutputRedirector to ensure messages are visible
                 scraped_content = self.scrape_content(selected_urls)
 
                 if not scraped_content:
@@ -123,7 +146,9 @@ class EnhancedSelfImprovingSearch:
                 print(f"{Fore.MAGENTA}Decision: {decision}{Style.RESET_ALL}")
 
                 if decision == "answer":
-                    return self.generate_final_answer(user_query, scraped_content)
+                    # If Tavily provided an AI answer, include it in the final answer generation
+                    ai_answer = search_results.get('answer', '') if search_results.get('provider') == 'tavily' else ''
+                    return self.generate_final_answer(user_query, scraped_content, ai_answer)
                 elif decision == "refine":
                     print(f"{Fore.YELLOW}Refining search...{Style.RESET_ALL}")
                     attempt += 1
@@ -138,157 +163,81 @@ class EnhancedSelfImprovingSearch:
 
         return self.synthesize_final_answer(user_query)
 
-    def evaluate_scraped_content(self, user_query: str, scraped_content: Dict[str, str]) -> Tuple[str, str]:
-        user_query_short = user_query[:200]
-        prompt = f"""
-Evaluate if the following scraped content contains sufficient information to answer the user's question comprehensively:
+    def formulate_query(self, query: str, attempt: int) -> Tuple[str, str]:
+        """Placeholder for query formulation - returns original query and default time range."""
+        return query, 'none'
 
-User's question: "{user_query_short}"
-
-Scraped Content:
-{self.format_scraped_content(scraped_content)}
-
-Your task:
-1. Determine if the scraped content provides enough relevant and detailed information to answer the user's question thoroughly.
-2. If the information is sufficient, decide to 'answer'. If more information or clarification is needed, decide to 'refine' the search.
-
-Respond using EXACTLY this format:
-Evaluation: [Your evaluation of the scraped content]
-Decision: [ONLY 'answer' if content is sufficient, or 'refine' if more information is needed]
-"""
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                response_text = self.llm.generate(prompt, max_tokens=200, stop=None)
-                evaluation, decision = self.parse_evaluation_response(response_text)
-                if decision in ['answer', 'refine']:
-                    return evaluation, decision
-            except Exception as e:
-                logger.warning(f"Error in evaluate_scraped_content (attempt {attempt + 1}): {str(e)}")
-
-        logger.warning("Failed to get a valid decision in evaluate_scraped_content. Defaulting to 'refine'.")
-        return "Failed to evaluate content.", "refine"
-
-    def parse_evaluation_response(self, response: str) -> Tuple[str, str]:
-        evaluation = ""
-        decision = ""
-        for line in response.strip().split('\n'):
-            if line.startswith('Evaluation:'):
-                evaluation = line.split(':', 1)[1].strip()
-            elif line.startswith('Decision:'):
-                decision = line.split(':', 1)[1].strip().lower()
-        return evaluation, decision
-
-    def formulate_query(self, user_query: str, attempt: int) -> Tuple[str, str]:
-        user_query_short = user_query[:200]
-        prompt = f"""
-Based on the following user question, formulate a concise and effective search query:
-"{user_query_short}"
-Your task:
-1. Create a search query of 2-5 words that will yield relevant results.
-2. Determine if a specific time range is needed for the search.
-Time range options:
-- 'd': Limit results to the past day. Use for very recent events or rapidly changing information.
-- 'w': Limit results to the past week. Use for recent events or topics with frequent updates.
-- 'm': Limit results to the past month. Use for relatively recent information or ongoing events.
-- 'y': Limit results to the past year. Use for annual events or information that changes yearly.
-- 'none': No time limit. Use for historical information or topics not tied to a specific time frame.
-Respond in the following format:
-Search query: [Your 2-5 word query]
-Time range: [d/w/m/y/none]
-Do not provide any additional information or explanation.
-"""
-        max_retries = 3
-        for retry in range(max_retries):
-            with OutputRedirector() as output:
-                response_text = self.llm.generate(prompt, max_tokens=50, stop=None)
-            llm_output = output.getvalue()
-            logger.info(f"LLM Output in formulate_query:\n{llm_output}")
-            query, time_range = self.parse_query_response(response_text)
-            if query and time_range:
-                return query, time_range
-        return self.fallback_query(user_query), "none"
-
-    def parse_query_response(self, response: str) -> Tuple[str, str]:
-        query = ""
-        time_range = "none"
-        for line in response.strip().split('\n'):
-            if ":" in line:
-                key, value = line.split(":", 1)
-                key = key.strip().lower()
-                value = value.strip()
-                if "query" in key:
-                    query = self.clean_query(value)
-                elif "time" in key or "range" in key:
-                    time_range = self.validate_time_range(value)
-        return query, time_range
-
-    def clean_query(self, query: str) -> str:
-        query = re.sub(r'["\'\[\]]', '', query)
-        query = re.sub(r'\s+', ' ', query)
-        return query.strip()[:100]
-
-    def validate_time_range(self, time_range: str) -> str:
-        valid_ranges = ['d', 'w', 'm', 'y', 'none']
-        time_range = time_range.lower()
-        return time_range if time_range in valid_ranges else 'none'
-
-    def fallback_query(self, user_query: str) -> str:
-        words = user_query.split()
-        return " ".join(words[:5])
-
-    def perform_search(self, query: str, time_range: str) -> List[Dict]:
+    def perform_search(self, query: str, time_range: str) -> Dict[str, Any]:
+        """
+        Perform search using SearchManager with time range adaptation and rate limiting.
+        """
         if not query:
-            return []
+            return {'success': False, 'error': 'Empty query', 'results': [], 'provider': None}
+        
+        # Rate limiting check
+        current_time = time.time()
+        time_since_last_request = current_time - self.last_request_time
+        
+        # Check if we need to cool down
+        if self.request_count >= self.requests_per_minute:
+            if time_since_last_request < self.cooldown_period:
+                logger.warning(f"Rate limit reached. Cooling down for {self.cooldown_period - time_since_last_request:.1f} seconds")
+                time.sleep(self.cooldown_period - time_since_last_request)
+                self.request_count = 0
+        
+        # Update rate limiting trackers
+        self.last_request_time = time.time()
+        self.request_count += 1
+        
+        search_params = {
+            'max_results': RESEARCH_CONFIG['search']['max_results_per_search'],
+            'min_relevance_score': RESEARCH_CONFIG['search']['min_relevance_score']
+        }
+        
+        # Add time range parameters if specified
+        time_params = {
+            'd': {'days': 1},
+            'w': {'days': 7},
+            'm': {'days': 30},
+            'y': {'days': 365},
+            'none': {}
+        }
+        search_params.update(time_params.get(time_range.lower(), {}))
+        
+        return self.search_manager.search(query, **search_params)
 
-        from duckduckgo_search import DDGS
-
-        with DDGS() as ddgs:
-            try:
-                with OutputRedirector() as output:
-                    if time_range and time_range != 'none':
-                        results = list(ddgs.text(query, timelimit=time_range, max_results=10))
-                    else:
-                        results = list(ddgs.text(query, max_results=10))
-                ddg_output = output.getvalue()
-                logger.info(f"DDG Output in perform_search:\n{ddg_output}")
-                return [{'number': i+1, **result} for i, result in enumerate(results)]
-            except Exception as e:
-                print(f"{Fore.RED}Search error: {str(e)}{Style.RESET_ALL}")
-                return []
-
-    def display_search_results(self, results: List[Dict]) -> None:
-        """Display search results with minimal output"""
+    def display_search_results(self, results: Dict[str, Any]) -> None:
+        """Display search results with provider information"""
         try:
-            if not results:
+            if not results['success']:
+                print(f"{Fore.RED}Search failed: {results.get('error', 'Unknown error')}{Style.RESET_ALL}")
                 return
 
-            # Only show search success status
-            print(f"\nSearch query sent to DuckDuckGo: {self.last_query}")
-            print(f"Time range sent to DuckDuckGo: {self.last_time_range}")
-            print(f"Number of results: {len(results)}")
+            print(f"\n{Fore.CYAN}Search Results from {results['provider'].upper()}:{Style.RESET_ALL}")
+            print(f"Query: {self.last_query}")
+            print(f"Time range: {self.last_time_range}")
+            print(f"Number of results: {len(results['results'])}")
+            
+            if results.get('answer'):
+                print(f"\n{Fore.GREEN}AI-Generated Summary:{Style.RESET_ALL}")
+                print(results['answer'])
 
         except Exception as e:
             logger.error(f"Error displaying search results: {str(e)}")
 
     def select_relevant_pages(self, search_results: List[Dict], user_query: str) -> List[str]:
-        prompt = f"""
-Given the following search results for the user's question: "{user_query}"
-Select the 2 most relevant results to scrape and analyze. Explain your reasoning for each selection.
-
-Search Results:
-{self.format_results(search_results)}
-
-Instructions:
-1. You MUST select exactly 2 result numbers from the search results.
-2. Choose the results that are most likely to contain comprehensive and relevant information to answer the user's question.
-3. Provide a brief reason for each selection.
-
-You MUST respond using EXACTLY this format and nothing else:
-
-Selected Results: [Two numbers corresponding to the selected results]
-Reasoning: [Your reasoning for the selections]
-"""
+        prompt = (
+            f"Given the following search results for the user's question: \"{user_query}\"\n"
+            "Select the 2 most relevant results to scrape and analyze. Explain your reasoning for each selection.\n\n"
+            f"Search Results:\n{self.format_results(search_results)}\n\n"
+            "Instructions:\n"
+            "1. You MUST select exactly 2 result numbers from the search results.\n"
+            "2. Choose the results that are most likely to contain comprehensive and relevant information to answer the user's question.\n"
+            "3. Provide a brief reason for each selection.\n\n"
+            "You MUST respond using EXACTLY this format and nothing else:\n\n"
+            "Selected Results: [Two numbers corresponding to the selected results]\n"
+            "Reasoning: [Your reasoning for the selections]"
+        )
 
         max_retries = 3
         for retry in range(max_retries):
@@ -297,45 +246,31 @@ Reasoning: [Your reasoning for the selections]
             llm_output = output.getvalue()
             logger.info(f"LLM Output in select_relevant_pages:\n{llm_output}")
 
-            parsed_response = self.parse_page_selection_response(response_text)
-            if parsed_response and self.validate_page_selection_response(parsed_response, len(search_results)):
-                selected_urls = [result['href'] for result in search_results if result['number'] in parsed_response['selected_results']]
+            parsed_response = {int(char) for char in response_text[:40] if char.isdigit()}
+            selected_urls = [search_results['results'][i-1]['url'] for i in parsed_response]
 
-                allowed_urls = [url for url in selected_urls if can_fetch(url)]
-                if allowed_urls:
-                    return allowed_urls
-                else:
-                    print(f"{Fore.YELLOW}Warning: All selected URLs are disallowed by robots.txt. Retrying selection.{Style.RESET_ALL}")
+            allowed_urls = [url for url in selected_urls if can_fetch(url)]
+            if allowed_urls:
+                return allowed_urls
             else:
-                print(f"{Fore.YELLOW}Warning: Invalid page selection. Retrying.{Style.RESET_ALL}")
+                print(f"{Fore.YELLOW}Warning: All selected URLs are disallowed by robots.txt. Retrying selection.{Style.RESET_ALL}")
+
 
         print(f"{Fore.YELLOW}Warning: All attempts to select relevant pages failed. Falling back to top allowed results.{Style.RESET_ALL}")
-        allowed_urls = [result['href'] for result in search_results if can_fetch(result['href'])][:2]
+        allowed_urls = [result['url'] for result in search_results if can_fetch(result['url'])][:2]
         return allowed_urls
 
-    def parse_page_selection_response(self, response: str) -> Dict[str, Union[List[int], str]]:
-        lines = response.strip().split('\n')
-        parsed = {}
-        for line in lines:
-            if line.startswith('Selected Results:'):
-                parsed['selected_results'] = [int(num.strip()) for num in re.findall(r'\d+', line)]
-            elif line.startswith('Reasoning:'):
-                parsed['reasoning'] = line.split(':', 1)[1].strip()
-        return parsed if 'selected_results' in parsed and 'reasoning' in parsed else None
-
-    def validate_page_selection_response(self, parsed_response: Dict[str, Union[List[int], str]], num_results: int) -> bool:
-        if len(parsed_response['selected_results']) != 2:
-            return False
-        if any(num < 1 or num > num_results for num in parsed_response['selected_results']):
-            return False
-        return True
 
     def format_results(self, results: List[Dict]) -> str:
         formatted_results = []
-        for result in results:
-            formatted_result = f"{result['number']}. Title: {result.get('title', 'N/A')}\n"
-            formatted_result += f"   Snippet: {result.get('body', 'N/A')[:200]}...\n"
-            formatted_result += f"   URL: {result.get('href', 'N/A')}\n"
+        for i, result in enumerate(results['results'], 1):
+            formatted_result = f"{i}. Title: {result.get('title', 'N/A')}\n"
+            formatted_result += f"   Snippet: {result.get('content', 'N/A')[:200]}...\n"
+            formatted_result += f"   URL: {result.get('url', 'N/A')}\n"
+            if result.get('published_date'):
+                formatted_result += f"   Published: {result['published_date']}\n"
+            if result.get('score'):
+                formatted_result += f"   Relevance Score: {result['score']}\n"
             formatted_results.append(formatted_result)
         return "\n".join(formatted_results)
 
@@ -373,27 +308,30 @@ Reasoning: [Your reasoning for the selections]
             print(f"{Fore.GREEN}URL: {url}{Style.RESET_ALL}")
             print(f"Content: {content[:4000]}...\n")
 
-    def generate_final_answer(self, user_query: str, scraped_content: Dict[str, str]) -> str:
+    def generate_final_answer(self, user_query: str, scraped_content: Dict[str, str], ai_answer: str = '') -> str:
         user_query_short = user_query[:200]
-        prompt = f"""
-You are an AI assistant. Provide a comprehensive and detailed answer to the following question using ONLY the information provided in the scraped content. Do not include any references or mention any sources. Answer directly and thoroughly.
+        ai_summary = f"AI-Generated Summary:\n{ai_answer}\n\n" if ai_answer else ""
+        
+        prompt = (
+            f"You are an AI assistant. Provide a comprehensive and detailed answer to the following question "
+            f"using the provided information. Do not include any references or mention any sources. "
+            f"Answer directly and thoroughly.\n\n"
+            f"Question: \"{user_query_short}\"\n\n"
+            f"{ai_summary}"
+            f"Scraped Content:\n{self.format_scraped_content(scraped_content)}\n\n"
+            f"Important Instructions:\n"
+            f"1. Do not use phrases like \"Based on the absence of selected results\" or similar.\n"
+            f"2. If the scraped content does not contain enough information to answer the question, "
+            f"say so explicitly and explain what information is missing.\n"
+            f"3. Provide as much relevant detail as possible from the scraped content.\n"
+            f"4. If an AI-generated summary is provided, use it to enhance your answer but don't rely on it exclusively.\n\n"
+            f"Answer:"
+        )
 
-Question: "{user_query_short}"
-
-Scraped Content:
-{self.format_scraped_content(scraped_content)}
-
-Important Instructions:
-1. Do not use phrases like "Based on the absence of selected results" or similar.
-2. If the scraped content does not contain enough information to answer the question, say so explicitly and explain what information is missing.
-3. Provide as much relevant detail as possible from the scraped content.
-
-Answer:
-"""
         max_retries = 3
         for attempt in range(max_retries):
             with OutputRedirector() as output:
-                response_text = self.llm.generate(prompt, max_tokens=1024, stop=None)
+                response_text = self.llm.generate(prompt, max_tokens=4096, stop=None)
             llm_output = output.getvalue()
             logger.info(f"LLM Output in generate_final_answer:\n{llm_output}")
             if response_text:
@@ -407,19 +345,18 @@ Answer:
     def format_scraped_content(self, scraped_content: Dict[str, str]) -> str:
         formatted_content = []
         for url, content in scraped_content.items():
-            content = re.sub(r'\s+', ' ', content)
-            formatted_content.append(f"Content from {url}:\n{content}\n")
+            content = re.sub(self.WHITESPACE_PATTERN, ' ', content)
+            formatted_content.append(f"Content from {url}:{content}")
         return "\n".join(formatted_content)
 
     def synthesize_final_answer(self, user_query: str) -> str:
-        prompt = f"""
-After multiple search attempts, we couldn't find a fully satisfactory answer to the user's question: "{user_query}"
-
-Please provide the best possible answer you can, acknowledging any limitations or uncertainties.
-If appropriate, suggest ways the user might refine their question or where they might find more information.
-
-Respond in a clear, concise, and informative manner.
-"""
+        prompt = (
+            f"After multiple search attempts, we couldn't find a fully satisfactory answer to the user's question: "
+            f"\"{user_query}\"\n\n"
+            f"Please provide the best possible answer you can, acknowledging any limitations or uncertainties.\n"
+            f"If appropriate, suggest ways the user might refine their question or where they might find more information.\n\n"
+            f"Respond in a clear, concise, and informative manner."
+        )
         try:
             with OutputRedirector() as output:
                 response_text = self.llm.generate(prompt, max_tokens=self.llm_config.get('max_tokens', 1024), stop=self.llm_config.get('stop', None))

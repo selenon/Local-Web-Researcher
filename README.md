@@ -15,7 +15,7 @@ Click the image above to watch the demonstration of My Project.
 2. The LLM analyzes your query and generates 5 specific research focus areas, each with assigned priorities based on relevance to the topic or question.
 3. Starting with the highest priority area, the LLM:
    - Formulates targeted search queries
-   - Performs web searches
+   - Performs web searches using multiple providers (Tavily, Brave, Bing, Exa)
    - Analyzes search results selecting the most relevant web pages
    - Scrapes and extracts relevant information for selected web pages
    - Documents all content it has found during the research session into a research text file including links to websites that the content was retrieved from
@@ -27,14 +27,43 @@ The key distinction is that this isn't just a chatbot - it's an automated resear
 
 ## Features
 - Automated research planning with prioritized focus areas
+- Multi-provider search system with automatic fallback
 - Systematic web searching and content analysis
 - All research content and source URLs saved into a detailed text document
 - Research summary generation
 - Post-research Q&A capability about findings
-- Self-improving search mechanism
+- Self-improving search mechanism with provider optimization
 - Rich console output with status indicators
 - Comprehensive answer synthesis using web-sourced information
 - Research conversation mode for exploring findings
+
+## Search Providers
+The system supports multiple search providers with automatic fallback:
+
+1. Tavily (Primary)
+   - AI-powered search with relevance scoring
+   - Includes AI-generated summaries
+   - Optimized for research queries
+
+2. Brave Search
+   - High-quality web results
+   - Built-in relevance scoring
+   - Real-time indexing
+
+3. Bing
+   - Comprehensive web coverage
+   - News and recent content
+   - Academic results
+
+4. Exa
+   - Specialized search capabilities
+   - High-precision results
+   - Content highlighting
+
+5. DuckDuckGo (Fallback)
+   - Privacy-focused results
+   - No API key required
+   - Reliable fallback option
 
 ## Installation
 
@@ -58,7 +87,17 @@ source venv/bin/activate  # On Windows, use venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-4. Install and Configure Ollama:
+4. Set up API keys:
+Create a `.env` file in the project root with your API keys:
+```
+TAVILY_API_KEY=your_tavily_key
+BRAVE_API_KEY=your_brave_key
+BING_API_KEY=your_bing_key
+EXA_API_KEY=your_exa_key
+```
+Note: The system will work with any combination of configured providers. If a provider's API key is not set, it will be skipped in the fallback chain. You don't need them all. If you don't add any, DuckDuckGo will be used.
+
+5. Install and Configure Ollama:
 - Install Ollama following instructions at https://ollama.ai
 - Using your selected model file, create a custom model variant with the required context length
   (phi3:3.8b-mini-128k-instruct or phi3:14b-medium-128k-instruct are recommended)
@@ -117,7 +156,14 @@ python Web-LLM.py
 
 ## Configuration
 
-The LLM settings can be modified in `llm_config.py`. You must specify your model name in the configuration for the researcher to function. The default configuration is optimized for research tasks with the specified Phi-3 model.
+The system can be configured through several files:
+
+1. `llm_config.py`: LLM settings and model configuration
+2. `system_config.py`: Search provider settings, including:
+   - Default provider selection
+   - Fallback order
+   - Provider-specific parameters
+   - Rate limiting controls
 
 ## Current Status
 This is a prototype that demonstrates functional automated research capabilities. While still in development, it successfully performs structured research tasks. Currently tested and working well with the phi3:3.8b-mini-128k-instruct model when the context is set as advised previously.
@@ -126,6 +172,7 @@ This is a prototype that demonstrates functional automated research capabilities
 - Ollama
 - Python packages listed in requirements.txt
 - Recommended model: phi3:3.8b-mini-128k-instruct or phi3:14b-medium-128k-instruct (with custom context length as specified)
+- API keys for desired search providers
 
 ## Contributing
 Contributions are welcome! This is a prototype with room for improvements and new features.
@@ -135,7 +182,8 @@ This project is licensed under the MIT License - see the [LICENSE] file for deta
 
 ## Acknowledgments
 - Ollama team for their local LLM runtime
-- DuckDuckGo for their search API
+- Search providers: Tavily, Brave, Bing, Exa, and DuckDuckGo
+- Contributors to the Python packages used in this project
 
 ## Personal Note
 This tool represents an attempt to bridge the gap between simple LLM interactions and genuine research capabilities. By structuring the research process and maintaining documentation, it aims to provide more thorough and verifiable results than traditional LLM conversations. It also represents an attempt to improve on my previous project 'Web-LLM-Assistant-Llamacpp-Ollama' which simply gave LLM's the ability to search and scrape websites to answer questions. This new program, unlike it's predecessor I feel thos program takes that capability and uses it in a novel and actually very useful way, I feel that it is the most advanced and useful way I could conceive of building on my previous program, as a very new programmer this being my second ever program I feel very good about the result, I hope that it hits the mark! 

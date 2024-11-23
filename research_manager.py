@@ -19,6 +19,7 @@ import tty
 from threading import Event
 from urllib.parse import urlparse
 from pathlib import Path
+from system_config import get_research_config
 
 # Initialize colorama for cross-platform color support
 if os.name == 'nt':  # Windows-specific initialization
@@ -46,6 +47,7 @@ for name in logging.root.manager.loggerDict:
     if name != __name__:
         logging.getLogger(name).disabled = True
 
+RESEARCH_CONFIG = get_research_config()
 @dataclass
 class ResearchFocus:
     """Represents a specific area of research focus"""
@@ -378,8 +380,16 @@ class TerminalUI:
             self.status_win = None
 
     def _cleanup(self):
-        """Enhanced resource cleanup with better process handling"""
+        """Enhanced cleanup to handle conversation mode and auto-save"""
+        self.conversation_active = False
         self.should_terminate.set()
+
+        # Wait for auto-save thread to finish if it exists
+        if hasattr(self, 'auto_save_thread') and self.auto_save_thread and self.auto_save_thread.is_alive():
+            try:
+                self.auto_save_thread.join(timeout=1.0)
+            except Exception as e:
+                logger.error(f"Error cleaning up auto-save thread: {str(e)}")
 
         # Handle research thread with improved termination
         if self.research_thread and self.research_thread.is_alive():
@@ -752,10 +762,18 @@ Do not provide any additional information or explanation, note that the time ran
             return {'query': '', 'time_range': 'none'}
 
     def _cleanup(self):
-        """Enhanced cleanup to handle conversation mode"""
+        """Enhanced cleanup to handle conversation mode and auto-save"""
         self.conversation_active = False
         self.should_terminate.set()
 
+        # Wait for auto-save thread to finish if it exists
+        if hasattr(self, 'auto_save_thread') and self.auto_save_thread and self.auto_save_thread.is_alive():
+            try:
+                self.auto_save_thread.join(timeout=1.0)
+            except Exception as e:
+                logger.error(f"Error cleaning up auto-save thread: {str(e)}")
+
+        # Handle research thread with improved termination
         if self.research_thread and self.research_thread.is_alive():
             try:
                 self.research_thread.join(timeout=1.0)
@@ -778,7 +796,7 @@ Do not provide any additional information or explanation, note that the time ran
             self.ui.cleanup()
 
     def _initialize_document(self):
-        """Initialize research session document"""
+        """Initialize research session document with auto-backup"""
         try:
             # Get all existing research session files
             self.session_files = []
@@ -801,6 +819,10 @@ Do not provide any additional information or explanation, note that the time ran
                 f.write(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write("="*80 + "\n\n")
                 f.flush()
+
+            # Setup auto-save if enabled
+            if RESEARCH_CONFIG['storage']['auto_save']:
+                self._start_auto_save()
 
         except Exception as e:
             logger.error(f"Error initializing document: {str(e)}")
@@ -983,15 +1005,11 @@ Do not provide any additional information or explanation, note that the time ran
         try:
             with open(self.document_path, 'r', encoding='utf-8') as f:
                 content = f.read()
-            estimated_tokens = len(content.split()) * 1.3
-            max_tokens = self.llm.llm_config.get('n_ctx', 2048)
-            current_ratio = estimated_tokens / max_tokens
-
-            if current_ratio > 0.8:
-                logger.warning(f"Document size at {current_ratio*100:.1f}% of context limit")
-                self.ui.update_output(f"Warning: Document size at {current_ratio*100:.1f}% of context limit")
-
-            return current_ratio > 0.9
+            if len(content) >= RESEARCH_CONFIG['content']['max_document_size']:
+                logger.warning(f"Document size exceeded configured limit of {RESEARCH_CONFIG['content']['max_document_size']} characters")
+                self.ui.update_output(f"Warning: Document size exceeded configured limit")
+                return True
+            return False
         except Exception as e:
             logger.error(f"Error checking document size: {str(e)}")
             return True
@@ -1165,7 +1183,7 @@ Research Progress:
                 Summary:
                 """
 
-                summary = self.llm.generate(summary_prompt, max_tokens=4000)
+                summary = self.llm.generate(summary_prompt, max_tokens=16384)
 
                 # Signal that summary is complete to stop the progress indicator
                 self.summary_ready = True
@@ -1429,6 +1447,36 @@ Answer:
             # Restore terminal settings
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
             print()  # New line for clean display
+
+    def _start_auto_save(self):
+        """Start auto-save thread to periodically save research progress"""
+        def auto_save_loop():
+            while not self.should_terminate.is_set():
+                try:
+                    # Create backup file name with timestamp
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    backup_path = f"{self.document_path}.{timestamp}.bak"
+                    
+                    # Copy current document to backup
+                    if os.path.exists(self.document_path):
+                        with open(self.document_path, 'r', encoding='utf-8') as src:
+                            content = src.read()
+                            with open(backup_path, 'w', encoding='utf-8') as dst:
+                                dst.write(content)
+                        
+                        # Keep only last x backups defined in config item 
+                        backups = sorted([f for f in os.listdir() if f.startswith(f"{self.document_path}.") and f.endswith(".bak")])
+                        while len(backups) > RESEARCH_CONFIG['storage']['max_backups']:
+                            os.remove(backups.pop(0))
+                            
+                    time.sleep(RESEARCH_CONFIG['storage']['auto_save_interval'])  
+                except Exception as e:
+                    logger.error(f"Error in auto-save: {str(e)}")
+                    time.sleep(60)  # Wait a minute before retrying if there's an error
+        
+        # Start auto-save thread
+        self.auto_save_thread = threading.Thread(target=auto_save_loop, daemon=True)
+        self.auto_save_thread.start()
 
 if __name__ == "__main__":
     from llm_wrapper import LLMWrapper

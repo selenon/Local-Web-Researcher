@@ -269,7 +269,7 @@ def main():
                     handle_research_mode(research_manager, research_query)
 
                 else:
-                    print(f"{Fore.RED}Please start with '/' for search or '@' for research.{Style.RESET_ALL}")
+                    print(f"{Fore.RED}Please start with '@' for research.{Style.RESET_ALL}")
 
             except KeyboardInterrupt:
                 print(f"\n{Fore.YELLOW}Exiting program...{Style.RESET_ALL}")
