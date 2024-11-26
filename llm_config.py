@@ -1,6 +1,6 @@
 # llm_config.py
 
-LLM_TYPE = "anthropic"  # Options: 'llama_cpp', 'ollama', 'openai', 'anthropic'
+LLM_TYPE = "ollama"  # Options: 'ollama', 'openai', 'anthropic'
 
 # LLM settings for llama_cpp
 MODEL_PATH = "/home/james/llama.cpp/models/gemma-2-9b-it-Q6_K.gguf" # Replace with your llama.cpp models filepath
