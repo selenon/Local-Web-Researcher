@@ -81,6 +81,22 @@ The key distinction is that this isn't just a chatbot—it's an automated resear
 
     **Note:** This specific configuration is necessary as recent Ollama versions have reduced context windows on models like `phi3:3.8b-mini-128k-instruct` despite the name suggesting high context, which is why the `modelfile` step is necessary due to the large amount of information used during the research process.
 
+5. Go to the llm_config.py file which should hav an ollama section that looks like this:
+
+LLM_CONFIG_OLLAMA = {
+    "llm_type": "ollama",
+    "base_url": "http://localhost:11434",  # default Ollama server URL
+    "model_name": "custom-phi3-32k-Q4_K_M",  # Replace with your Ollama model name
+    "temperature": 0.7,
+    "top_p": 0.9,
+    "n_ctx": 55000,
+    "context_length": 55000,
+    "stop": ["User:", "\n\n"]
+
+
+And then change where it says replace with your Ollama model name, to the name of the model you have setup in Ollama to use with the program. 
+   
+
 ## Usage
 1. **Start Ollama:**
 
