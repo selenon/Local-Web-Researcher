@@ -95,7 +95,7 @@ LLM_CONFIG_OLLAMA = {
     "stop": ["User:", "\n\n"]
 ```
 
-And then change where it says replace with your Ollama model name, to the name of the model you have setup in Ollama to use with the program. 
+Then change to the left of where it says replace with your Ollama model name, the "model_name" function, to the name of the model you have setup in Ollama to use with the program.
    
 
 ## Usage
