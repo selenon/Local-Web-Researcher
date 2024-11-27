@@ -83,6 +83,7 @@ The key distinction is that this isn't just a chatbot—it's an automated resear
 
 5. Go to the llm_config.py file which should hav an ollama section that looks like this:
 
+    ```sh
 LLM_CONFIG_OLLAMA = {
     "llm_type": "ollama",
     "base_url": "http://localhost:11434",  # default Ollama server URL
@@ -92,7 +93,7 @@ LLM_CONFIG_OLLAMA = {
     "n_ctx": 55000,
     "context_length": 55000,
     "stop": ["User:", "\n\n"]
-
+    ```
 
 And then change where it says replace with your Ollama model name, to the name of the model you have setup in Ollama to use with the program. 
    
