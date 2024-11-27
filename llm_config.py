@@ -14,7 +14,10 @@ LLM_CONFIG_OLLAMA = {
     "stop": ["User:", "\n\n"]
 }
 
-# LLM settings for OpenAI
+# LLM settings for OpenAI 
+# WARNING: This application makes frequent API calls during research operations. If using paid API services 
+# (OpenAI/Anthropic), this can result in significant costs accumulating quickly - proceed with caution and 
+# monitor your API usage carefully if it's paid.
 LLM_CONFIG_OPENAI = {
     "llm_type": "openai",
     "api_key": "",  # Set via environment variable OPENAI_API_KEY
@@ -29,6 +32,9 @@ LLM_CONFIG_OPENAI = {
 }
 
 # LLM settings for Anthropic
+# WARNING: This application makes frequent API calls during research operations. If using paid API services 
+# (OpenAI/Anthropic), this can result in significant costs accumulating quickly - proceed with caution and 
+# monitor your API usage carefully if it's paid.
 LLM_CONFIG_ANTHROPIC = {
     "llm_type": "anthropic",
     "api_key": "",  # Set via environment variable ANTHROPIC_API_KEY
