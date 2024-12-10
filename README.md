@@ -61,27 +61,9 @@ The key distinction is that this isn't just a chatbot—it's an automated resear
 
     Install Ollama following the instructions at [https://ollama.ai](https://ollama.ai).
 
-    Using your selected model file, create a custom model variant with the required context length (`phi3:3.8b-mini-128k-instruct` or `phi3:14b-medium-128k-instruct` are recommended).
+    Using your selected model, reccommended to pick one with the required context length for lots of searches (`phi3:3.8b-mini-128k-instruct` or `phi3:14b-medium-128k-instruct` are recommended).
 
-    Create a file named `modelfile` with the following exact contents:
-
-    ```
-    FROM your-model-name
-
-    PARAMETER num_ctx 38000
-    ```
-
-    Replace "your-model-name" with your chosen model (e.g., `phi3:3.8b-mini-128k-instruct`).
-
-    Then create the model:
-
-    ```sh
-    ollama create research-phi3 -f modelfile
-    ```
-
-    **Note:** This specific configuration is necessary as recent Ollama versions have reduced context windows on models like `phi3:3.8b-mini-128k-instruct` despite the name suggesting high context, which is why the `modelfile` step is necessary due to the large amount of information used during the research process.
-
-5. Go to the llm_config.py file which should hav an ollama section that looks like this:
+5. Go to the llm_config.py file which should have an ollama section that looks like this:
 
 ```sh
 LLM_CONFIG_OLLAMA = {
@@ -91,11 +73,10 @@ LLM_CONFIG_OLLAMA = {
     "temperature": 0.7,
     "top_p": 0.9,
     "n_ctx": 55000,
-    "context_length": 55000,
     "stop": ["User:", "\n\n"]
 ```
 
-Then change to the left of where it says replace with your Ollama model name, the "model_name" function, to the name of the model you have setup in Ollama to use with the program.
+Then change to the left of where it says replace with your Ollama model name, the "model_name" function, to the name of the model you have setup in Ollama to use with the program, you can now also change 'n_ctx' to set the desired context size.
    
 
 ## Usage
