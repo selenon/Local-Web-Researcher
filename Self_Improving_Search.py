@@ -242,20 +242,47 @@ Do not provide any additional information or explanation.
             return []
 
         from duckduckgo_search import DDGS
+        max_retries = 3
+        base_delay = 2  # Base delay in seconds
 
-        with DDGS() as ddgs:
+        for retry in range(max_retries):
             try:
-                with OutputRedirector() as output:
-                    if time_range and time_range != 'none':
-                        results = list(ddgs.text(query, timelimit=time_range, max_results=10))
-                    else:
-                        results = list(ddgs.text(query, max_results=10))
-                ddg_output = output.getvalue()
-                logger.info(f"DDG Output in perform_search:\n{ddg_output}")
-                return [{'number': i+1, **result} for i, result in enumerate(results)]
+                # Add delay that increases with each retry
+                if retry > 0:
+                    delay = base_delay * (2 ** (retry - 1))  # Exponential backoff
+                    print(f"{Fore.YELLOW}Rate limit hit. Waiting {delay} seconds before retry {retry + 1}/{max_retries}...{Style.RESET_ALL}")
+                    time.sleep(delay)
+
+                with DDGS() as ddgs:
+                    try:
+                        with OutputRedirector() as output:
+                            if time_range and time_range != 'none':
+                                results = list(ddgs.text(query, timelimit=time_range, max_results=10))
+                            else:
+                                results = list(ddgs.text(query, max_results=10))
+                            
+                            ddg_output = output.getvalue()
+                            logger.info(f"DDG Output in perform_search:\n{ddg_output}")
+                            
+                            # If we get here, search was successful
+                            return [{'number': i+1, **result} for i, result in enumerate(results)]
+                            
+                    except Exception as e:
+                        if 'Ratelimit' in str(e):
+                            if retry == max_retries - 1:
+                                print(f"{Fore.RED}Final rate limit attempt failed: {str(e)}{Style.RESET_ALL}")
+                                return []
+                            continue  # Try again with delay
+                        else:
+                            print(f"{Fore.RED}Search error: {str(e)}{Style.RESET_ALL}")
+                            return []
+
             except Exception as e:
-                print(f"{Fore.RED}Search error: {str(e)}{Style.RESET_ALL}")
+                print(f"{Fore.RED}Outer error: {str(e)}{Style.RESET_ALL}")
                 return []
+
+        print(f"{Fore.RED}All retry attempts failed for query: {query}{Style.RESET_ALL}")
+        return []
 
     def display_search_results(self, results: List[Dict]) -> None:
         """Display search results with minimal output"""
